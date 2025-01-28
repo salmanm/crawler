@@ -26,7 +26,7 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
   const isInternalLink = (url: string) => {
     try {
       const parsed = new URL(url);
-      return parsed.hostname.endsWith(domainToCrawl);
+      return parsed.hostname.endsWith('hse.ie');
     } catch {
       return false;
     }
