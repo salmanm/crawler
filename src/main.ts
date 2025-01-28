@@ -6,6 +6,7 @@ interface CrawlResult {
   url: string;
   httpCode: number;
   redirectsTo?: string;
+  referer?: string;
 }
 
 const domainToCrawl = 'webview.hse.ie'
@@ -68,6 +69,8 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
           }
         });
       }
+
+      result.referer = currentUrl;
 
       results.push(result);
     } catch (error) {
