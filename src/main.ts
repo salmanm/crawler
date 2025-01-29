@@ -18,7 +18,7 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
   const queue: string[] = [baseUrl]
 
   const customAxios = axios.create({
-    headers: { 'User-Agent': userAgent },
+    headers: { 'User-Agent': userAgent, 'accept-language': 'en-US,en;q=0.9' },
     maxRedirects: 0, // To capture redirection URLs
     validateStatus: () => true, // Handle all status codes
   })
@@ -30,6 +30,12 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
     }
 
     return type.includes('text/html')
+  }
+
+  const sanitize = (href: string, currentUrl: string) => {
+    const url = new URL(href, currentUrl)
+    url.hash = ''
+    return url.toString().replace(/\/\?page=\d+&?/, '/?')
   }
 
   const isInternalLink = (url: string) => {
@@ -44,6 +50,7 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
   while (queue.length > 0) {
     const currentUrl = queue.shift()!
     console.log('Remaining in queue:', queue.length)
+
     if (visited.has(currentUrl)) continue
 
     visited.add(currentUrl)
@@ -60,31 +67,29 @@ const crawlWebsite = async (baseUrl: string, userAgent: string): Promise<CrawlRe
       if (response.status >= 300 && response.status < 400 && response.headers.location) {
         const redirectUrl = new URL(response.headers.location, currentUrl).toString()
         result.redirectsTo = redirectUrl
+        result.referer = currentUrl
 
         if (isInternalLink(redirectUrl) && !visited.has(redirectUrl)) {
           queue.push(redirectUrl)
           console.log('Adding to queue:', redirectUrl)
         }
-      } else if (response.status === 200 && isHtml(response)) {
-        if (currentUrl.startsWith(baseUrl)) {
-          console.log('================', 'EXPLORING', currentUrl, '================')
-          const $ = cheerio.load(response.data)
-          $('a').each((_index, element) => {
-            const href = $(element).attr('href')
-            if (href) {
-              const absoluteUrl = new URL(href, currentUrl).toString()
-              if (isInternalLink(absoluteUrl) && !visited.has(absoluteUrl)) {
+      } else if (response.status === 200 && isHtml(response) && currentUrl.startsWith(baseUrl)) {
+        const $ = cheerio.load(response.data)
+
+        $('a').each((_index, element) => {
+          const href = $(element).attr('href')
+
+          if (href) {
+            const absoluteUrl = sanitize(href, currentUrl)
+            if (isInternalLink(absoluteUrl) && !visited.has(absoluteUrl)) {
+              if (queue.indexOf(absoluteUrl) === -1) {
                 queue.push(absoluteUrl)
                 console.log('Adding to queue:', absoluteUrl)
               }
             }
-          })
-        } else {
-          console.log('================', 'EXTERNAL', currentUrl, '================')
-        }
+          }
+        })
       }
-
-      result.referer = currentUrl
 
       results.push(result)
     } catch (error) {
